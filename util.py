@@ -79,10 +79,156 @@ def __idx2vec(size, idx):
     ret[idx] = 1
     return ret
 
-def gen_data_rec(c_data, c_val2idx):
+def gen_data_rec(c_data, c_val2idx): # for learning embeddings
     size = len(c_val2idx)
     ret = [[[__idx2vec(size, [c_val2idx[key] for key in chord]) for chord in measure] for measure in song] for song in c_data]
     return ret
+
+def gen_data_rec_v2(c_data, c_val2idx):
+    size = len(c_val2idx)
+    ret = []
+    for song in c_data:
+        curr_song = []
+        for measure in song:
+            curr_measure = []
+            curr_measure.append(np.zeros(size))
+            curr_measure.extend([ __idx2vec(size, [c_val2idx[key] for key in chord]) for chord in measure ])
+            curr_measure.append(np.ones(size))
+            curr_song.append(curr_measure)
+        ret.append(curr_song)
+    return ret        
+
+
+def gen_data_rec_pitch_based(c_data, c_val2idx, meas_per_seq=1):
+    
+    num_pitches = len(c_val2idx)
+    
+    ret_encoder_input = []
+    ret_decoder_input = []
+    ret_decoder_target = []
+    
+    for song in c_data[:]:
+        
+        curr_song_encoder_input = []
+        curr_song_decoder_input = []
+        curr_song_decoder_target = []
+        
+        for i in range(len(song) - meas_per_seq):
+            
+            encoder_input = []
+            decoder_input = []
+            decoder_target = []
+            
+            curr_seq = ['<S>']
+            curr_seq_de_in = ['<S>']
+            
+            for j in range(meas_per_seq):
+                for chord in song[i + j]:
+                    curr_seq.extend(chord)
+                    curr_seq.append('/')
+                for chord in song[i + j + 1]:
+                    curr_seq_de_in.extend(chord)
+                    curr_seq_de_in.append('/')
+            
+            curr_seq[-1] = '<END>'
+            curr_seq_de_in[-1] = '<END>'
+            curr_seq_de_tar = curr_seq_de_in[1 : ]
+            curr_seq_de_in = curr_seq_de_in[: -1]
+            
+            encoder_input.extend([__idx2vec(num_pitches, c_val2idx[key]) for key in curr_seq])
+            decoder_input.extend([__idx2vec(num_pitches, c_val2idx[key]) for key in curr_seq_de_in])
+            decoder_target.extend([__idx2vec(num_pitches, c_val2idx[key]) for key in curr_seq_de_tar])
+            
+            curr_song_encoder_input.append(np.array(encoder_input))
+            curr_song_decoder_input.append(np.array(decoder_input))
+            curr_song_decoder_target.append(np.array(decoder_target))
+        
+        ret_encoder_input.append(curr_song_encoder_input)
+        ret_decoder_input.append(curr_song_decoder_input)
+        ret_decoder_target.append(curr_song_decoder_target)
+    
+    return ret_encoder_input, ret_decoder_input, ret_decoder_target
+
+
+def gen_data_rec_pitch_based_times(c_data, c_val2idx, t_data, t_val2idx, meas_per_seq=1):
+    
+    num_pitches = len(c_val2idx)
+    num_times = len(t_val2idx)
+    
+    ret_encoder_input = []
+    ret_decoder_input = []
+    ret_decoder_target = []
+    
+    for song in c_data[:]:
+        
+        curr_song_encoder_input = []
+        
+        for i in range(len(song) - meas_per_seq):
+            
+            encoder_input = []
+            
+            curr_seq = ['<S>']
+            
+            for j in range(meas_per_seq):
+                for chord in song[i + j]:
+                    curr_seq.extend(chord)
+                    curr_seq.append('/')
+            
+            curr_seq[-1] = '<END>'
+            
+            encoder_input.extend([__idx2vec(num_pitches, c_val2idx[key]) for key in curr_seq])
+            
+            curr_song_encoder_input.append(np.array(encoder_input))
+        
+        ret_encoder_input.append(curr_song_encoder_input)
+    
+    for song in t_data[:]:
+        
+        curr_song_decoder_input = []
+        curr_song_decoder_target = []
+        
+        for i in range(len(song) - meas_per_seq):
+            
+            decoder_input = []
+            decoder_target = []
+            
+            curr_seq_de_in = ['<S>']
+            
+            for j in range(meas_per_seq):
+                for time in song[i + j + 1]:
+                    curr_seq_de_in.append(time)
+            
+            curr_seq_de_in[-1] = '<END>'
+            curr_seq_de_tar = curr_seq_de_in[1 : ]
+            curr_seq_de_in = curr_seq_de_in[: -1]
+            
+            decoder_input.extend([__idx2vec(num_times, t_val2idx[key]) for key in curr_seq_de_in])
+            decoder_target.extend([__idx2vec(num_times, t_val2idx[key]) for key in curr_seq_de_tar])
+            
+            curr_song_decoder_input.append(np.array(decoder_input))
+            curr_song_decoder_target.append(np.array(decoder_target))
+        
+        ret_decoder_input.append(curr_song_decoder_input)
+        ret_decoder_target.append(curr_song_decoder_target)
+    
+    
+    return ret_encoder_input, ret_decoder_input, ret_decoder_target
+
+
+# to fit the keras model, return a list of 3D array
+def get_data_fitted(data): # data: [song, seq, pitch, feature_dim]
+    
+    ret = []
+    feat_dim = len(data[0][0][0])
+    
+    for song in data:
+        max_seq_len = max([len(seq) for seq in song])
+        to_add = np.zeros((len(song), max_seq_len, feat_dim))
+        for i, seq in enumerate(song):
+            to_add[i, : len(seq)] = seq
+        ret.append(to_add)
+    return ret
+
 
 def flatten_by_song(data):
     # can be used to chord2vec
