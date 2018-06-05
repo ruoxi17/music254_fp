@@ -46,6 +46,7 @@ def parse_file(chord_dir, time_dir, save_dir, mps=2, ignore_illegal=True, tempo=
                         if not ignore_illegal: 
                             new_noteon.add(-pitch)
                             track.append(mido.Message('note_on', note=-pitch, velocity=120, time=time))
+                            
                 time = 0
 
             noteoff_set = noteon_set - new_noteon
@@ -61,14 +62,17 @@ def parse_file(chord_dir, time_dir, save_dir, mps=2, ignore_illegal=True, tempo=
                 else: break
 
             else: 
-                if time_sum >= mps * 2: break
+                #if time_sum >= mps * 2: break
                 time = int(float(times[i][j]) * 480)
                 time_sum += time
         
-        for pitch in noteon_set:
-            track.append(mido.Message('note_off', note=pitch, velocity=100, time=time))
+#         for pitch in noteon_set:
+#             track.append(mido.Message('note_off', note=pitch, velocity=100, time=time))
     
-    mid.save(save_dir + chord_dir[-8 : -4] + '.mid')
+        try:
+            mid.save(save_dir + chord_dir[-8 : -4] + '.mid')
+        except ValueError:
+            continue
     
     
     
