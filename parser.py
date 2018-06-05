@@ -2,7 +2,7 @@ import mido
 import os
 
 
-def parse_file(chord_dir, time_dir, save_dir, ignore_illegal=True):
+def parse_file(chord_dir, time_dir, save_dir, mps=2, ignore_illegal=True, tempo=800000):
     
     with open(chord_dir, 'r') as f:
         lines = f.readlines()
@@ -17,7 +17,7 @@ def parse_file(chord_dir, time_dir, save_dir, ignore_illegal=True):
     mid = mido.MidiFile()
     track = mido.MidiTrack()
     mid.tracks.append(track)
-    track.append(mido.MetaMessage('set_tempo', tempo=800000))
+    track.append(mido.MetaMessage('set_tempo', tempo=tempo))
 
     for i, seq in enumerate(data):
         if i >= len(times): break
@@ -56,19 +56,23 @@ def parse_file(chord_dir, time_dir, save_dir, ignore_illegal=True):
                 track.append(mido.Message('note_off', note=pitch, velocity=100, time=time))
 
             if j >= len(times[i]): 
-                if time_sum < 4:
-                    time = 0.25
+                if time_sum < mps * 2:
+                    time = int(0.25 * 480)
                 else: break
 
             else: 
+                if time_sum >= mps * 2: break
                 time = int(float(times[i][j]) * 480)
                 time_sum += time
+        
+        for pitch in noteon_set:
+            track.append(mido.Message('note_off', note=pitch, velocity=100, time=time))
     
     mid.save(save_dir + chord_dir[-8 : -4] + '.mid')
     
     
     
-def parse_files(chords_dir, times_dir, save_dir, ignore_illegal=True):
+def parse_files(chords_dir, times_dir, save_dir, ignore_illegal=True, tempo=800000):
     
     chords_files = [f for f in os.listdir(chords_dir) if f.endswith('.txt')]
     chords_files.sort()
@@ -77,5 +81,5 @@ def parse_files(chords_dir, times_dir, save_dir, ignore_illegal=True):
     times_files.sort()
     
     for i, c_fn in enumerate(chords_files):
-        parse_file(chords_dir + c_fn, times_dir + times_files[i], save_dir, ignore_illegal=ignore_illegal)        
+        parse_file(chords_dir + c_fn, times_dir + times_files[i], save_dir, ignore_illegal=ignore_illegal, tempo=tempo)        
     

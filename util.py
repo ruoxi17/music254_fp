@@ -150,6 +150,57 @@ def gen_data_rec_pitch_based(c_data, c_val2idx, meas_per_seq=1):
     return ret_encoder_input, ret_decoder_input, ret_decoder_target
 
 
+def gen_data_rec_pitch_based_emb(c_data, c_val2idx, meas_per_seq=1):
+    
+    num_pitches = len(c_val2idx)
+    
+    ret_encoder_input = []
+    ret_decoder_input = []
+    ret_decoder_target = []
+    
+    for song in c_data[:]:
+        
+        curr_song_encoder_input = []
+        curr_song_decoder_input = []
+        curr_song_decoder_target = []
+        
+        for i in range(len(song) - meas_per_seq):
+            
+            encoder_input = []
+            decoder_input = []
+            decoder_target = []
+            
+            curr_seq = ['<S>']
+            curr_seq_de_in = ['<S>']
+            
+            for j in range(meas_per_seq):
+                for chord in song[i + j]:
+                    curr_seq.extend(chord)
+                    curr_seq.append('/')
+                for chord in song[i + j + 1]:
+                    curr_seq_de_in.extend(chord)
+                    curr_seq_de_in.append('/')
+            
+            curr_seq[-1] = '<END>'
+            curr_seq_de_in[-1] = '<END>'
+            curr_seq_de_tar = curr_seq_de_in[1 : ]
+            curr_seq_de_in = curr_seq_de_in[: -1]
+            
+            encoder_input.extend([c_val2idx[key] for key in curr_seq])
+            decoder_input.extend([c_val2idx[key] for key in curr_seq_de_in])
+            decoder_target.extend([c_val2idx[key] for key in curr_seq_de_tar])
+            
+            curr_song_encoder_input.append(np.array(encoder_input))
+            curr_song_decoder_input.append(np.array(decoder_input))
+            curr_song_decoder_target.append(np.array(decoder_target))
+        
+        ret_encoder_input.append(curr_song_encoder_input)
+        ret_decoder_input.append(curr_song_decoder_input)
+        ret_decoder_target.append(curr_song_decoder_target)
+    
+    return ret_encoder_input, ret_decoder_input, ret_decoder_target
+
+
 def gen_data_rec_pitch_based_times(c_data, c_val2idx, t_data, t_val2idx, meas_per_seq=1):
     
     num_pitches = len(c_val2idx)
@@ -224,6 +275,20 @@ def get_data_fitted(data): # data: [song, seq, pitch, feature_dim]
     for song in data:
         max_seq_len = max([len(seq) for seq in song])
         to_add = np.zeros((len(song), max_seq_len, feat_dim))
+        for i, seq in enumerate(song):
+            to_add[i, : len(seq)] = seq
+        ret.append(to_add)
+    return ret
+
+
+def get_data_fitted_emb(data, c_val2idx): # data: [song, seq, pitch, feature_dim]
+    
+    ret = []
+    
+    for song in data:
+        max_seq_len = max([len(seq) for seq in song])
+        #print(max_seq_len)
+        to_add = np.ones((len(song), max_seq_len), dtype='int32') * c_val2idx['<PAD>']
         for i, seq in enumerate(song):
             to_add[i, : len(seq)] = seq
         ret.append(to_add)
